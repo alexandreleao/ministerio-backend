@@ -16,5 +16,9 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "prisma": "^5.22.0"
-  }
+  },
+  "prisma": {
+  "seed": "node ./prisma/seed.js"
+}
+  
 }
