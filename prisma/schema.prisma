@@ -1,0 +1,35 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Student {
+  id    Int    @id @default(autoincrement())
+  name  String
+  assignments Assignment[]
+  helpedAssignments Assignment[] @relation("Helper")
+}
+
+model Week {
+  id          Int          @id @default(autoincrement())
+  startDate   DateTime
+  assignments Assignment[]
+}
+
+model Assignment {
+  id           Int      @id @default(autoincrement())
+  type         String
+  title        String
+  duration     Int
+  studentId    Int
+  helperId     Int?
+  weekId       Int
+
+  student      Student  @relation(fields: [studentId], references: [id])
+  helper       Student? @relation("Helper", fields: [helperId], references: [id])
+  week         Week     @relation(fields: [weekId], references: [id])
+}
