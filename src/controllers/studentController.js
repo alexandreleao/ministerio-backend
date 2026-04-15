@@ -1,4 +1,5 @@
 import prisma from "../database/prisma.js";
+import { success, error } from "../utils/response.js";
 
 // 🔹 Criar estudante
 export async function createStudent(req, res) {
@@ -6,30 +7,32 @@ export async function createStudent(req, res) {
     const { name } = req.body;
 
     if (!name) {
-      return res.status(400).json({
-        error: "Nome é obrigatório"
-      });
+      return error(res, "Nome é obrigatório", 400);
     }
 
     const student = await prisma.student.create({
       data: { name }
     });
 
-    return res.status(201).json(student);
+    return success(res, student, 201);
 
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
+  } catch (err) {
+    return error(res, err.message, 500);
   }
 }
 
 // 🔹 Listar estudantes
 export async function getStudents(req, res) {
   try {
-    const students = await prisma.student.findMany();
+    const students = await prisma.student.findMany({
+      orderBy: {
+        name: "asc"
+      }
+    });
 
-    return res.json(students);
+    return success(res, students);
 
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
+  } catch (err) {
+    return error(res, err.message, 500);
   }
 }

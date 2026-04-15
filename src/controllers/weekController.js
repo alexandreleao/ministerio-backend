@@ -1,4 +1,5 @@
 import prisma from "../database/prisma.js";
+import { success, error } from "../utils/response.js";
 
 // 🔹 Criar semana
 export async function createWeek(req, res) {
@@ -6,9 +7,7 @@ export async function createWeek(req, res) {
     const { startDate } = req.body;
 
     if (!startDate) {
-      return res.status(400).json({
-        error: "Data inicial é obrigatória"
-      });
+      return error(res, "Data inicial é obrigatória", 400);
     }
 
     const week = await prisma.week.create({
@@ -17,10 +16,10 @@ export async function createWeek(req, res) {
       }
     });
 
-    return res.status(201).json(week);
+    return success(res, week, 201);
 
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
+  } catch (err) {
+    return error(res, err.message, 500);
   }
 }
 
@@ -33,9 +32,9 @@ export async function getWeeks(req, res) {
       }
     });
 
-    return res.json(weeks);
+    return success(res, weeks);
 
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
+  } catch (err) {
+    return error(res, err.message, 500);
   }
 }
