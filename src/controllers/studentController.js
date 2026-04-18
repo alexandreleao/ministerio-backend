@@ -6,21 +6,16 @@ export async function createStudent(req, res) {
   try {
     const { name } = req.body;
 
-    if (!name) {
-      return error(res, "Nome é obrigatório", 400);
-    }
-
     const student = await prisma.student.create({
       data: { name }
     });
 
-    return success(res, student, 201);
+    return res.json(student);
 
-  } catch (err) {
-    return error(res, err.message, 500);
+  } catch (error) {
+    return res.status(500).json({ error: "Erro ao criar estudante" });
   }
 }
-
 // 🔹 Listar estudantes
 export async function getStudents(req, res) {
   try {

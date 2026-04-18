@@ -1,101 +1,10 @@
-import prisma from "../database/prisma.js";
-import { success, error } from "../utils/response.js";
+import prisma from "../prisma/client.js";
+import { generateAssignments } from "../services/assignmentGenerator.js";
 
-// 🔹 Criar designação
-export async function createAssignment(req, res) {
-  try {
-    const { type, title, duration, studentId, helperId, weekId } = req.body;
-
-    // 🔥 validações básicas
-    if (!type || !title || !duration || !studentId || !weekId) {
-      return error(res, "Dados obrigatórios não informados", 400);
-    }
-
-    if (type === "Discurso" && helperId) {
-      return error(res, "Discurso não pode ter ajudante", 400);
-    }
-
-    if (studentId === helperId) {
-      return error(res, "Estudante não pode ser ajudante de si mesmo", 400);
-    }
-
-    // 🔍 verificar se estudante já tem designação na semana
-    const existing = await prisma.assignment.findFirst({
-      where: {
-        weekId,
-        OR: [
-          { studentId },
-          { helperId: studentId },
-          { studentId: helperId }
-        ]
-      }
-    });
-
-    if (existing) {
-      return error(res, "Estudante já possui designação nesta semana", 400);
-    }
-
-    // 🔍 verificar se student existe
-    const studentExists = await prisma.student.findUnique({
-      where: { id: studentId }
-    });
-
-    if (!studentExists) {
-      return error(res, "Estudante não encontrado", 404);
-    }
-
-    // 🔍 verificar helper (se existir)
-    if (helperId) {
-      const helperExists = await prisma.student.findUnique({
-        where: { id: helperId }
-      });
-
-      if (!helperExists) {
-        return error(res, "Ajudante não encontrado", 404);
-      }
-    }
-
-    // 🔍 verificar semana
-    const weekExists = await prisma.week.findUnique({
-      where: { id: weekId }
-    });
-
-    if (!weekExists) {
-      return error(res, "Semana não encontrada", 404);
-    }
-
-    // 🔥 criar designação
-    const assignment = await prisma.assignment.create({
-      data: {
-        type,
-        title,
-        duration,
-        studentId,
-        helperId: helperId || null,
-        weekId
-      },
-      include: {
-        student: true,
-        helper: true,
-        week: true
-      }
-    });
-
-    return success(res, assignment, 201);
-
-  } catch (err) {
-    return error(res, err.message, 500);
-  }
-}
-
-// 🔹 Listar designações por semana
+// 📋 listar
 export async function getAssignments(req, res) {
   try {
     const { weekId } = req.query;
-
-    if (!weekId) {
-      return error(res, "weekId é obrigatório", 400);
-    }
 
     const assignments = await prisma.assignment.findMany({
       where: {
@@ -110,9 +19,69 @@ export async function getAssignments(req, res) {
       }
     });
 
-    return success(res, assignments);
+    return res.json({
+      success: true,
+      data: assignments
+    });
 
-  } catch (err) {
-    return error(res, err.message, 500);
+  } catch (error) {
+    return res.status(500).json({ error: "Erro ao buscar designações" });
+  }
+}
+
+// ➕ criar manual
+export async function createAssignment(req, res) {
+  try {
+    const { type, title, duration, studentId, helperId, weekId } = req.body;
+
+    // 🔒 regras de negócio
+    if (type === "Discurso" && helperId) {
+      return res.status(400).json({
+        error: "Discurso não pode ter ajudante"
+      });
+    }
+
+    if (
+      ["Iniciando Conversa", "Revisita", "Estudo Bíblico"].includes(type) &&
+      !helperId
+    ) {
+      return res.status(400).json({
+        error: `${type} precisa de ajudante`
+      });
+    }
+
+    const assignment = await prisma.assignment.create({
+      data: {
+        type,
+        title,
+        duration,
+        studentId,
+        helperId: helperId || null,
+        weekId
+      }
+    });
+
+    return res.json(assignment);
+
+  } catch (error) {
+    return res.status(500).json({ error: "Erro ao criar designação" });
+  }
+}
+
+// ⚡ gerar semana
+export async function generateWeek(req, res) {
+  try {
+    const { weekId } = req.body;
+
+    if (!weekId) {
+      return res.status(400).json({ error: "weekId é obrigatório" });
+    }
+
+    const assignments = await generateAssignments(weekId);
+
+    return res.json(assignments);
+
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
   }
 }

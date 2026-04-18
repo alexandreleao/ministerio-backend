@@ -1,8 +1,17 @@
 import express from "express";
-import { createAssignment, getAssignments } from "../controllers/assignmentController.js";
+import {
+  getAssignments,
+  createAssignment,
+  generateWeek
+} from "../controllers/assignmentController.js";
 
 const router = express.Router();
 
-router.post("/", createAssignment);
+// ✔ correto
 router.get("/", getAssignments);
+router.post("/", createAssignment);
+
+// ✔ mantém separado
+router.post("/generate-week", generateWeek);
+
 export default router;

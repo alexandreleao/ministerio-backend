@@ -10,11 +10,11 @@ const app = express();
 app.use(express.json());
 
 // 🔥 REGISTRAR ROTAS
+app.use(cors());
 app.use("/students", studentRoutes);
 app.use("/weeks", weekRoutes);
 app.use("/assignments", assignmentRoutes);
 app.use("/generate-week", generateRoutes);
-app.use(cors());
 app.use(errorHandler);
 
 app.get("/", (req, res) => {
