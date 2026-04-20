@@ -213,12 +213,10 @@ export async function generateWeek(req, res) {
       });
     }
 
-    // 🧹 limpa semana (permite regenerar)
     await prisma.assignment.deleteMany({
       where: { weekId }
     });
 
-    // 👥 estudantes
     const students = await prisma.student.findMany();
 
     if (students.length < 2) {
@@ -227,18 +225,20 @@ export async function generateWeek(req, res) {
       });
     }
 
-    // 📊 histórico recente
+    // 📊 histórico
     const history = await prisma.assignment.findMany({
-      take: 50,
+      take: 100,
       orderBy: { id: "desc" }
     });
 
-    // 🧠 contagem de participação
+    // 🧠 contagem de participação (com peso)
     const participation = {};
 
     for (const a of history) {
+      const weight = a.type === "Discurso" ? 2 : 1;
+
       participation[a.studentId] =
-        (participation[a.studentId] || 0) + 1;
+        (participation[a.studentId] || 0) + weight;
 
       if (a.helperId) {
         participation[a.helperId] =
@@ -246,13 +246,13 @@ export async function generateWeek(req, res) {
       }
     }
 
-    // 📅 semana anterior
+    // 🚫 evitar repetição da semana passada
     const lastWeek = await prisma.week.findFirst({
       where: { id: { lt: weekId } },
       orderBy: { id: "desc" }
     });
 
-    let lastWeekIds = new Set();
+    const lastWeekIds = new Set();
 
     if (lastWeek) {
       const lastAssignments = await prisma.assignment.findMany({
@@ -262,6 +262,16 @@ export async function generateWeek(req, res) {
       for (const a of lastAssignments) {
         lastWeekIds.add(a.studentId);
         if (a.helperId) lastWeekIds.add(a.helperId);
+      }
+    }
+
+    // 🚫 histórico de duplas
+    const pairHistory = new Set();
+
+    for (const a of history) {
+      if (a.helperId) {
+        pairHistory.add(`${a.studentId}-${a.helperId}`);
+        pairHistory.add(`${a.helperId}-${a.studentId}`);
       }
     }
 
@@ -282,6 +292,18 @@ export async function generateWeek(req, res) {
       return sorted.find(s => !used.has(s.id));
     }
 
+    function findHelper(student) {
+      // tenta evitar dupla repetida
+      const candidate = sorted.find(s => {
+        if (used.has(s.id)) return false;
+
+        const pairKey = `${student.id}-${s.id}`;
+        return !pairHistory.has(pairKey);
+      });
+
+      return candidate || nextStudent();
+    }
+
     const types = [
       { type: "Iniciando Conversa", duration: 5 },
       { type: "Revisita", duration: 5 },
@@ -300,7 +322,7 @@ export async function generateWeek(req, res) {
       let helper = null;
 
       if (t.type !== "Discurso") {
-        helper = nextStudent();
+        helper = findHelper(student);
         if (!helper) break;
 
         used.add(helper.id);
@@ -326,7 +348,7 @@ export async function generateWeek(req, res) {
     });
 
   } catch (error) {
-    console.error("ERRO INTELIGÊNCIA:", error);
+    console.error("ERRO NÍVEL 2:", error);
 
     return res.status(500).json({
       error: "Erro ao gerar escala inteligente"
