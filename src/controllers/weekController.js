@@ -1,29 +1,61 @@
 import prisma from "../database/prisma.js";
 import { success, error } from "../utils/response.js";
 
+// 🧠 pega segunda-feira da semana atual
+function getStartOfWeek(date = new Date()) {
+  const d = new Date(date);
+  const day = d.getDay();
+
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+
+  const monday = new Date(d.setDate(diff));
+  monday.setHours(0, 0, 0, 0);
+
+  return monday;
+}
+
 // 🔹 Criar semana
 export async function createWeek(req, res) {
   try {
-    const { startDate } = req.body;
+    // 🔥 pega última semana
+    const lastWeek = await prisma.week.findFirst({
+      orderBy: { startDate: "desc" }
+    });
 
-    if (!startDate) {
-      return error(res, "Data inicial é obrigatória", 400);
+    let startDate;
+
+    if (!lastWeek) {
+      // primeira semana
+      startDate = getStartOfWeek();
+    } else {
+      // próxima semana
+      const next = new Date(lastWeek.startDate);
+      next.setDate(next.getDate() + 7);
+      startDate = next;
+    }
+
+    // 🔥 PROTEÇÃO EXTRA (evita duplicar mesmo assim)
+    const existing = await prisma.week.findFirst({
+      where: { startDate }
+    });
+
+    if (existing) {
+      return res.json(existing);
     }
 
     const week = await prisma.week.create({
-      data: {
-        startDate: new Date(startDate)
-      }
+      data: { startDate }
     });
 
-    return success(res, week, 201);
+    return res.json(week);
 
   } catch (err) {
-    return error(res, err.message, 500);
+    console.error(err);
+    return res.status(500).json({ error: err.message });
   }
 }
 
-// 🔹 Listar semanas
+// 🔹 Listar semanas (mantém igual)
 export async function getWeeks(req, res) {
   try {
     const weeks = await prisma.week.findMany({
@@ -38,3 +70,4 @@ export async function getWeeks(req, res) {
     return error(res, err.message, 500);
   }
 }
+

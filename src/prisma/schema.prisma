@@ -15,21 +15,24 @@ model Student {
 }
 
 model Week {
-  id          Int          @id @default(autoincrement())
-  startDate   DateTime
+  id        Int      @id @default(autoincrement())
+  startDate DateTime @unique
+
   assignments Assignment[]
 }
 
 model Assignment {
-  id           Int      @id @default(autoincrement())
-  type         String
-  title        String
-  duration     Int
-  studentId    Int
-  helperId     Int?
-  weekId       Int
+  id          Int      @id @default(autoincrement())
+  type        String
+  title       String
+  duration    Int
 
-  student      Student  @relation(fields: [studentId], references: [id])
-  helper       Student? @relation("Helper", fields: [helperId], references: [id])
-  week         Week     @relation(fields: [weekId], references: [id])
+  studentId   Int
+  helperId    Int?
+  weekId      Int
+
+  student     Student  @relation("StudentAssignments", fields: [studentId], references: [id])
+  helper      Student? @relation("HelperAssignments", fields: [helperId], references: [id])
+
+  week        Week     @relation(fields: [weekId], references: [id], onDelete: Cascade) // 🔥 AQUI
 }

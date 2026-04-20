@@ -1,7 +1,7 @@
 import prisma from "../prisma/client.js";
-import { generateAssignments } from "../services/assignmentGenerator.js";
 
-// 📋 listar
+
+// 📋 LISTAR
 export async function getAssignments(req, res) {
   try {
     const { weekId } = req.query;
@@ -25,28 +25,51 @@ export async function getAssignments(req, res) {
     });
 
   } catch (error) {
-    return res.status(500).json({ error: "Erro ao buscar designações" });
+    console.error(error);
+    return res.status(500).json({
+      error: "Erro ao buscar designações"
+    });
   }
 }
 
-// ➕ criar manual
+
+// ➕ CRIAR
 export async function createAssignment(req, res) {
   try {
     const { type, title, duration, studentId, helperId, weekId } = req.body;
 
-    // 🔒 regras de negócio
-    if (type === "Discurso" && helperId) {
+    if (studentId === helperId) {
       return res.status(400).json({
-        error: "Discurso não pode ter ajudante"
+        error: "Aluno e ajudante não podem ser iguais"
       });
     }
 
-    if (
-      ["Iniciando Conversa", "Revisita", "Estudo Bíblico"].includes(type) &&
-      !helperId
-    ) {
+    const existing = await prisma.assignment.findFirst({
+      where: {
+        weekId,
+        OR: [
+          { studentId },
+          { helperId: studentId }
+        ]
+      }
+    });
+
+    if (existing) {
       return res.status(400).json({
-        error: `${type} precisa de ajudante`
+        error: "Esse aluno já está designado nessa semana"
+      });
+    }
+
+    const sameType = await prisma.assignment.findFirst({
+      where: {
+        weekId,
+        type
+      }
+    });
+
+    if (sameType) {
+      return res.status(400).json({
+        error: "Já existe uma designação desse tipo na semana"
       });
     }
 
@@ -56,36 +79,26 @@ export async function createAssignment(req, res) {
         title,
         duration,
         studentId,
-        helperId: helperId || null,
+        helperId,
         weekId
       }
     });
 
-    return res.json(assignment);
+    return res.json({
+      success: true,
+      data: assignment
+    });
 
   } catch (error) {
-    return res.status(500).json({ error: "Erro ao criar designação" });
+    console.error(error);
+    return res.status(500).json({
+      error: "Erro ao criar designação"
+    });
   }
 }
 
-// ⚡ gerar semana
-export async function generateWeek(req, res) {
-  try {
-    const { weekId } = req.body;
 
-    if (!weekId) {
-      return res.status(400).json({ error: "weekId é obrigatório" });
-    }
-
-    const assignments = await generateAssignments(weekId);
-
-    return res.json(assignments);
-
-  } catch (error) {
-    return res.status(400).json({ error: error.message });
-  }
-}
- // 📝 atualizar
+// 📝 ATUALIZAR
 export async function updateAssignment(req, res) {
   try {
     const { id } = req.params;
@@ -115,7 +128,8 @@ export async function updateAssignment(req, res) {
   }
 }
 
-// 🗑️ deletar
+
+// 🗑️ DELETAR
 export async function deleteAssignment(req, res) {
   try {
     const { id } = req.params;
@@ -130,6 +144,192 @@ export async function deleteAssignment(req, res) {
     console.error(error);
     return res.status(500).json({
       error: "Erro ao excluir designação"
+    });
+  }
+}
+
+
+// 📊 STATS
+export async function getStats(req, res) {
+  try {
+    const { weekId } = req.query;
+
+    const where = {};
+
+    if (weekId) {
+      where.weekId = Number(weekId);
+    }
+
+    const assignments = await prisma.assignment.findMany({
+      where,
+      include: {
+        student: true,
+        helper: true
+      }
+    });
+
+    const stats = {
+      totalAssignments: assignments.length,
+      byStudent: {},
+      byType: {}
+    };
+
+    for (const a of assignments) {
+      stats.byType[a.type] = (stats.byType[a.type] || 0) + 1;
+
+      if (a.student) {
+        stats.byStudent[a.student.name] =
+          (stats.byStudent[a.student.name] || 0) + 1;
+      }
+
+      if (a.helper) {
+        stats.byStudent[a.helper.name] =
+          (stats.byStudent[a.helper.name] || 0) + 1;
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: stats
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      error: "Erro ao gerar estatísticas"
+    });
+  }
+}
+
+
+// 🎲 GERAR SEMANA (VERSÃO ESTÁVEL)
+export async function generateWeek(req, res) {
+  try {
+    const { weekId } = req.body;
+
+    if (!weekId) {
+      return res.status(400).json({
+        error: "weekId é obrigatório"
+      });
+    }
+
+    // 🧹 limpa semana (permite regenerar)
+    await prisma.assignment.deleteMany({
+      where: { weekId }
+    });
+
+    // 👥 estudantes
+    const students = await prisma.student.findMany();
+
+    if (students.length < 2) {
+      return res.status(400).json({
+        error: "Cadastre pelo menos 2 estudantes"
+      });
+    }
+
+    // 📊 histórico recente
+    const history = await prisma.assignment.findMany({
+      take: 50,
+      orderBy: { id: "desc" }
+    });
+
+    // 🧠 contagem de participação
+    const participation = {};
+
+    for (const a of history) {
+      participation[a.studentId] =
+        (participation[a.studentId] || 0) + 1;
+
+      if (a.helperId) {
+        participation[a.helperId] =
+          (participation[a.helperId] || 0) + 1;
+      }
+    }
+
+    // 📅 semana anterior
+    const lastWeek = await prisma.week.findFirst({
+      where: { id: { lt: weekId } },
+      orderBy: { id: "desc" }
+    });
+
+    let lastWeekIds = new Set();
+
+    if (lastWeek) {
+      const lastAssignments = await prisma.assignment.findMany({
+        where: { weekId: lastWeek.id }
+      });
+
+      for (const a of lastAssignments) {
+        lastWeekIds.add(a.studentId);
+        if (a.helperId) lastWeekIds.add(a.helperId);
+      }
+    }
+
+    // 🧠 ordenação inteligente
+    const sorted = [...students].sort((a, b) => {
+      const pa = participation[a.id] || 0;
+      const pb = participation[b.id] || 0;
+
+      const penaltyA = lastWeekIds.has(a.id) ? 100 : 0;
+      const penaltyB = lastWeekIds.has(b.id) ? 100 : 0;
+
+      return (pa + penaltyA) - (pb + penaltyB);
+    });
+
+    const used = new Set();
+
+    function nextStudent() {
+      return sorted.find(s => !used.has(s.id));
+    }
+
+    const types = [
+      { type: "Iniciando Conversa", duration: 5 },
+      { type: "Revisita", duration: 5 },
+      { type: "Estudo Bíblico", duration: 6 },
+      { type: "Discurso", duration: 5 }
+    ];
+
+    const assignments = [];
+
+    for (const t of types) {
+      const student = nextStudent();
+      if (!student) break;
+
+      used.add(student.id);
+
+      let helper = null;
+
+      if (t.type !== "Discurso") {
+        helper = nextStudent();
+        if (!helper) break;
+
+        used.add(helper.id);
+      }
+
+      assignments.push({
+        type: t.type,
+        title: t.type,
+        duration: t.duration,
+        studentId: student.id,
+        helperId: helper ? helper.id : null,
+        weekId
+      });
+    }
+
+    await prisma.assignment.createMany({
+      data: assignments
+    });
+
+    return res.json({
+      success: true,
+      data: assignments
+    });
+
+  } catch (error) {
+    console.error("ERRO INTELIGÊNCIA:", error);
+
+    return res.status(500).json({
+      error: "Erro ao gerar escala inteligente"
     });
   }
 }
