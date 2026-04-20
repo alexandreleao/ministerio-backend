@@ -85,3 +85,51 @@ export async function generateWeek(req, res) {
     return res.status(400).json({ error: error.message });
   }
 }
+ // 📝 atualizar
+export async function updateAssignment(req, res) {
+  try {
+    const { id } = req.params;
+    const { type, title, duration, studentId, helperId } = req.body;
+
+    const updated = await prisma.assignment.update({
+      where: { id: Number(id) },
+      data: {
+        type,
+        title,
+        duration,
+        studentId,
+        helperId
+      }
+    });
+
+    return res.json({
+      success: true,
+      data: updated
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      error: "Erro ao atualizar designação"
+    });
+  }
+}
+
+// 🗑️ deletar
+export async function deleteAssignment(req, res) {
+  try {
+    const { id } = req.params;
+
+    await prisma.assignment.delete({
+      where: { id: Number(id) }
+    });
+
+    return res.json({ success: true });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      error: "Erro ao excluir designação"
+    });
+  }
+}
