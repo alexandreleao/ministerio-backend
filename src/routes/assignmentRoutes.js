@@ -6,7 +6,8 @@ import {
   updateAssignment,
   deleteAssignment,
   getStats,
-  generateWeek
+  generateWeek,
+  clearWeek
 } from "../controllers/assignmentController.js";
 
 const router = express.Router();
@@ -16,6 +17,7 @@ router.get("/", getAssignments);
 router.post("/", createAssignment);
 router.put("/:id", updateAssignment);
 router.delete("/:id", deleteAssignment);
+router.post("/clear-week", clearWeek);
 router.get("/stats", getStats);
 
 // ✔ mantém separado

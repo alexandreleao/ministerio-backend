@@ -1,38 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
 model Student {
-  id    Int    @id @default(autoincrement())
-  name  String
-  assignments Assignment[]
-  helpedAssignments Assignment[] @relation("Helper")
+  id     Int     @id @default(autoincrement())
+  name   String
+  gender String? // 👈 opcional por enquanto
+
+  // 🔥 RELAÇÕES (OBRIGATÓRIO)
+  assignments       Assignment[] @relation("StudentAssignments")
+  helpedAssignments Assignment[] @relation("HelperAssignments")
 }
 
 model Week {
-  id        Int      @id @default(autoincrement())
-  startDate DateTime @unique
+  id               Int      @id @default(autoincrement())
+  startDate        DateTime
+  hasDemonstration Boolean  @default(false)
 
   assignments Assignment[]
 }
 
 model Assignment {
-  id          Int      @id @default(autoincrement())
-  type        String
-  title       String
-  duration    Int
+  id       Int    @id @default(autoincrement())
+  type     String
+  title    String
+  duration Int
 
-  studentId   Int
-  helperId    Int?
-  weekId      Int
+  studentId Int
+  helperId  Int?
+  weekId    Int
 
-  student     Student  @relation("StudentAssignments", fields: [studentId], references: [id])
-  helper      Student? @relation("HelperAssignments", fields: [helperId], references: [id])
+  // 🔥 NOVOS CAMPOS (dashboard inteligente)
+  declined           Boolean @default(false)
+  declineReason      String?
+  needsEncouragement Boolean @default(false)
+  encouragementNote  String?
 
-  week        Week     @relation(fields: [weekId], references: [id], onDelete: Cascade) // 🔥 AQUI
+  // 🔥 RELAÇÕES NOMEADAS (AGORA CORRETAS)
+  student Student  @relation("StudentAssignments", fields: [studentId], references: [id], onDelete: Cascade)
+  helper  Student? @relation("HelperAssignments", fields: [helperId], references: [id], onDelete: SetNull)
+
+  week Week @relation(fields: [weekId], references: [id], onDelete: Cascade)
 }
