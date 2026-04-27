@@ -1,14 +1,18 @@
 import express from "express";
 import {
-  createStudent,
   getStudents,
+  createStudent,
   deleteStudent
 } from "../controllers/studentController.js";
 
+// ✅ IMPORT CORRETO
+import { authMiddleware } from "../middlewares/auth.js";
+
 const router = express.Router();
 
-router.post("/", createStudent);
-router.get("/", getStudents);
-router.delete("/:id", deleteStudent);
+// 🔐 ROTAS PROTEGIDAS
+router.get("/", authMiddleware, getStudents);
+router.post("/", authMiddleware, createStudent);
+router.delete("/:id", authMiddleware, deleteStudent);
 
 export default router;

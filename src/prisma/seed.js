@@ -1,33 +1,23 @@
-import prisma from "../src/database/prisma.js";
+import prisma from "./client.js";
+import bcrypt from "bcryptjs";
 
 async function main() {
-  console.log("🌱 Criando dados iniciais...");
+  const hash = await bcrypt.hash("123456", 10);
 
-  // 👤 estudantes
-  const joao = await prisma.student.create({
-    data: { name: "João" }
-  });
-
-  const maria = await prisma.student.create({
-    data: { name: "Maria" }
-  });
-
-  // 📅 semana
-  const week = await prisma.week.create({
+  const user = await prisma.user.create({
     data: {
-      startDate: new Date("2026-05-20")
+      email: "admin@email.com",
+      password: hash
     }
   });
 
-  console.log("✅ Seed finalizado!");
-  console.log({ joao, maria, week });
+  console.log("Usuário criado 🚀", user);
 }
 
 main()
-  .catch(e => {
-    console.error(e);
-    process.exit(1);
+  .catch((e) => {
+    console.error("Erro no seed:", e);
   })
-  .finally(() => {
-    prisma.$disconnect();
+  .finally(async () => {
+    await prisma.$disconnect();
   });
