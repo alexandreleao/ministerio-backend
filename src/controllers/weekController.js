@@ -1,61 +1,8 @@
-import prisma from "../database/prisma.js";
-import { success, error } from "../utils/response.js";
+import prisma from "../prisma/client.js";
 
-// 🧠 pega segunda-feira da semana atual
-function getStartOfWeek(date = new Date()) {
-  const d = new Date(date);
-  const day = d.getDay();
-
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-
-  const monday = new Date(d.setDate(diff));
-  monday.setHours(0, 0, 0, 0);
-
-  return monday;
-}
-
-// 🔹 Criar semana
-export async function createWeek(req, res) {
-  try {
-    // 🔥 pega última semana
-    const lastWeek = await prisma.week.findFirst({
-      orderBy: { startDate: "desc" }
-    });
-
-    let startDate;
-
-    if (!lastWeek) {
-      // primeira semana
-      startDate = getStartOfWeek();
-    } else {
-      // próxima semana
-      const next = new Date(lastWeek.startDate);
-      next.setDate(next.getDate() + 7);
-      startDate = next;
-    }
-
-    // 🔥 PROTEÇÃO EXTRA (evita duplicar mesmo assim)
-    const existing = await prisma.week.findFirst({
-      where: { startDate }
-    });
-
-    if (existing) {
-      return res.json(existing);
-    }
-
-    const week = await prisma.week.create({
-      data: { startDate }
-    });
-
-    return res.json(week);
-
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: err.message });
-  }
-}
-
-// 🔹 Listar semanas (mantém igual)
+/**
+ * 📥 LISTAR SEMANAS
+ */
 export async function getWeeks(req, res) {
   try {
     const weeks = await prisma.week.findMany({
@@ -64,10 +11,93 @@ export async function getWeeks(req, res) {
       }
     });
 
-    return success(res, weeks);
-
+    return res.json({
+      data: weeks
+    });
   } catch (err) {
-    return error(res, err.message, 500);
+    console.error("❌ Erro ao buscar semanas:", err);
+    return res.status(500).json({ error: "Erro ao buscar semanas" });
   }
 }
 
+/**
+ * ➕ CRIAR NOVA SEMANA
+ */
+export async function createWeek(req, res) {
+  try {
+    const week = await prisma.week.create({
+      data: {
+        startDate: new Date()
+      }
+    });
+
+    return res.status(201).json({
+      data: week
+    });
+  } catch (err) {
+    console.error("❌ Erro ao criar semana:", err);
+    return res.status(500).json({ error: "Erro ao criar semana" });
+  }
+}
+
+/**
+ * 🗑️ EXCLUIR SEMANA (E SUAS DESIGNAÇÕES)
+ * Rota esperada: DELETE /weeks/:id
+ */
+export async function deleteWeek(req, res) {
+  const { id } = req.params;
+
+  if (!id) {
+    return res.status(400).json({ error: "ID da semana é obrigatório na URL" });
+  }
+
+  try {
+    const weekId = Number(id);
+
+    // Usamos uma transação para garantir que ou deleta tudo ou nada
+    await prisma.$transaction([
+      // 1. Remove as designações primeiro (filhos)
+      prisma.assignment.deleteMany({
+        where: { weekId: weekId }
+      }),
+      // 2. Remove a semana depois (pai)
+      prisma.week.delete({
+        where: { id: weekId }
+      })
+    ]);
+
+    return res.json({ message: "Semana e designações excluídas com sucesso" });
+  } catch (err) {
+    console.error("❌ Erro ao excluir semana:", err);
+    return res.status(500).json({ error: "Erro ao excluir semana no banco de dados" });
+  }
+}
+
+/**
+ * 🧹 LIMPAR DESIGNAÇÕES DE UMA SEMANA
+ * Rota esperada: POST /weeks/clear
+ */
+export async function clearWeek(req, res) {
+  // Pegamos o weekId do corpo da requisição (body)
+  const { weekId } = req.body;
+
+  if (!weekId) {
+    return res.status(400).json({ error: "weekId é obrigatório no corpo da requisição" });
+  }
+
+  try {
+    const result = await prisma.assignment.deleteMany({
+      where: {
+        weekId: Number(weekId)
+      }
+    });
+
+    return res.json({
+      message: "Designações removidas com sucesso",
+      count: result.count
+    });
+  } catch (err) {
+    console.error("❌ Erro ao limpar designações:", err);
+    return res.status(500).json({ error: "Erro ao limpar designações" });
+  }
+}
