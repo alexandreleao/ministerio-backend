@@ -1,26 +1,27 @@
-import express from "express";
-import {
-  getAssignments,
-  createAssignment,
-  updateAssignment,
+import { Router } from "express";
+import { 
+  getAssignments, 
+  createAssignment, 
+  updateAssignment, 
   deleteAssignment,
-  getStats,
-  generateWeek,
-  clearWeek
+  updateStatus, 
+  getStats, 
+  generateWeek, 
+  clearWeek 
 } from "../controllers/assignmentController.js";
+import authMiddleware from "../middlewares/authMiddleware.js";
 
-// ✅ CORRETO
-import { authMiddleware } from "../middlewares/auth.js";
+const router = Router();
 
-const router = express.Router();
+// A rota de stats precisa do authMiddleware para não dar 403
+router.get("/stats", authMiddleware, getStats);
 
-// 🔐 ROTAS PROTEGIDAS
 router.get("/", authMiddleware, getAssignments);
 router.post("/", authMiddleware, createAssignment);
 router.put("/:id", authMiddleware, updateAssignment);
 router.delete("/:id", authMiddleware, deleteAssignment);
-router.get("/stats", authMiddleware, getStats);
-router.post("/clear-week", authMiddleware, clearWeek);
+router.patch("/:id/status", authMiddleware, updateStatus);
 router.post("/generate-week", authMiddleware, generateWeek);
+router.delete("/week/:id", authMiddleware, clearWeek);
 
 export default router;

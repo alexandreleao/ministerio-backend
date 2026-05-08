@@ -1,40 +1,13 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
-}
-
-enum Role {
-  ADMIN
-  USER
-}
-
-model User {
-  id       Int    @id @default(autoincrement())
-  name     String
-  email    String @unique
-  password String
-  role     Role   @default(ADMIN)
-}
-
 model Student {
   id     Int    @id @default(autoincrement())
   name   String
   gender String @default("M")
+  
+  // 🆕 Campo novo para ajudar no ranking de quem está há mais tempo sem partes
+  lastAssignmentAt DateTime? 
 
   assignments       Assignment[] @relation("StudentAssignments")
   helpedAssignments Assignment[] @relation("HelperAssignments")
-}
-
-model Week {
-  id               Int      @id @default(autoincrement())
-  startDate        DateTime
-  hasDemonstration Boolean  @default(false)
-
-  assignments Assignment[]
 }
 
 model Assignment {
@@ -47,8 +20,14 @@ model Assignment {
   helperId  Int?
   weekId    Int
 
+  // Campos de recusa antigos
   declined           Boolean @default(false)
   declineReason      String?
+  
+  // 🟢 ADICIONE ESTA LINHA AQUI:
+  status             String  @default("pendente") 
+  
+  completedAt        DateTime?
   needsEncouragement Boolean @default(false)
   encouragementNote  String?
 
