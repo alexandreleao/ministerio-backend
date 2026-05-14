@@ -20,8 +20,8 @@ router.get("/", authMiddleware, getAssignments);
 router.post("/", authMiddleware, createAssignment);
 router.put("/:id", authMiddleware, updateAssignment);
 router.delete("/:id", authMiddleware, deleteAssignment);
-router.patch("/:id/status", authMiddleware, updateStatus);
 router.post("/generate-week", authMiddleware, generateWeek);
 router.delete("/week/:id", authMiddleware, clearWeek);
+router.patch('/:id/status', authMiddleware, updateStatus);
 
 export default router;

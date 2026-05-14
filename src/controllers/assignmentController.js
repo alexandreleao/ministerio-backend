@@ -84,18 +84,9 @@ export const deleteAssignment = async (req, res) => {
 };
 
 // 🔄 3. STATUS E ATUALIZAÇÕES RÁPIDAS
-export const updateStatus = async (req, res) => {
-  try {
-    const { status, declineReason } = req.body;
-    const updated = await prisma.assignment.update({
-      where: { id: parseInt(req.params.id) },
-      data: { status, declineReason, completedAt: status === 'concluido' ? new Date() : null, declined: status === 'recusado' }
-    });
-    res.json(updated);
-  } catch (error) {
-    res.status(500).json({ error: "Erro ao atualizar status" });
-  }
-};
+// src/controllers/assignmentController.js
+
+
 
 // 📅 4. FUNÇÕES DE SEMANA (O QUE ESTAVA FALTANDO)
 export const clearWeek = async (req, res) => {
@@ -113,5 +104,38 @@ export const generateWeek = async (req, res) => {
     res.json({ message: "Função generateWeek chamada (Lógica de automação pendente)" });
   } catch (error) {
     res.status(500).json({ error: "Erro ao gerar semana" });
+  }
+};
+
+// Adicione esta função ao final do seu assignmentController.js
+
+export const updateStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status, declineReason } = req.body;
+
+  try {
+    // Validar se o status enviado é um dos permitidos
+    const validStatus = ['PENDING', 'COMPLETED', 'DECLINED'];
+    if (!validStatus.includes(status)) {
+      return res.status(400).json({ error: "Status inválido" });
+    }
+
+    const updated = await prisma.assignment.update({
+      where: { id: Number(id) },
+      data: { 
+        status: status,
+        // Se for uma recusa, salva o motivo. Se não, limpa o campo.
+        declineReason: status === 'DECLINED' ? declineReason : null
+      }
+    });
+
+    res.json({ 
+      success: true, 
+      message: "Status atualizado com sucesso",
+      data: updated 
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar status:", error);
+    res.status(500).json({ error: "Erro interno ao atualizar status" });
   }
 };
